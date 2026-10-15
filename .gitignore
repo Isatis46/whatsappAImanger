@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+.next/
+dist/
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+*.tsbuildinfo
+.local/
+test-results/
+__pycache__/
+*.pyc

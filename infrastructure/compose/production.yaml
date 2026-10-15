@@ -1,0 +1,110 @@
+name: whatsapp-ai
+x-runtime: &runtime
+  DATABASE_URL: postgresql://wa:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/wa
+  REDIS_URL: redis://redis:6379
+  MASTER_KEY: ${MASTER_KEY:?Set MASTER_KEY}
+  APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN to your HTTPS origin}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+  LOCAL_LLM_URL: ${LOCAL_LLM_URL:-}
+  LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-}
+  STORAGE_PATH: /app/.local/exports
+  NODE_ENV: production
+x-server: &server
+  image: whatsapp-ai-server:0.1.0
+  build:
+    context: ../..
+    target: server
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 75s
+  environment: *runtime
+  volumes: [exports:/app/.local/exports]
+  depends_on:
+    migrate: {condition: service_completed_successfully}
+    redis: {condition: service_healthy}
+  security_opt: [no-new-privileges:true]
+services:
+  postgres:
+    image: postgres:17.7-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wa
+      POSTGRES_DB: wa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U wa -d wa]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7.4.7-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, 'yes', --maxmemory-policy, noeviction]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    image: whatsapp-ai-server:0.1.0
+    build: {context: ../.., target: server}
+    restart: 'no'
+    command: [node, dist/infrastructure/scripts/migrate.js]
+    environment: *runtime
+    depends_on:
+      postgres: {condition: service_healthy}
+  bootstrap:
+    image: whatsapp-ai-server:0.1.0
+    profiles: [bootstrap]
+    restart: 'no'
+    command: [node, dist/infrastructure/scripts/bootstrap.js]
+    environment:
+      <<: *runtime
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
+      ORGANIZATION_NAME: ${ORGANIZATION_NAME:-My organization}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  api:
+    <<: *server
+    command: [node, dist/apps/api/src/main.js]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  gateway:
+    <<: *server
+    command: [node, dist/apps/gateway-worker/src/main.js]
+  jobs:
+    <<: *server
+    command: [node, dist/apps/job-worker/src/main.js]
+  web:
+    image: whatsapp-ai-web:0.1.0
+    build: {context: ../.., target: web}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api: {condition: service_healthy}
+    security_opt: [no-new-privileges:true]
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST}
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [web,api]
+volumes:
+  pgdata:
+  redisdata:
+  exports:
+  caddydata:
+  caddyconfig:

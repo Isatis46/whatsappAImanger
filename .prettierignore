@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.next/
+apps/admin-web/.next/
+.local/
+pnpm-lock.yaml
+docs/architecture/specification.fa.md

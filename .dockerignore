@@ -1,0 +1,12 @@
+.git
+node_modules
+**/node_modules
+**/.next
+.pnpm-store
+.local
+.env
+.env.*
+!.env.example
+dist
+test-results
+*.log

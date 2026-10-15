@@ -1,0 +1,13 @@
+{$PUBLIC_HOST} {
+  encode zstd gzip
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    Referrer-Policy "same-origin"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    -Server
+  }
+  @api path /api/* /socket.io/*
+  reverse_proxy @api api:4000
+  reverse_proxy web:3000
+}

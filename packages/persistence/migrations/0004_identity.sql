@@ -1,0 +1,2 @@
+ALTER TABLE conversations ADD COLUMN merged_into uuid REFERENCES conversations(id);
+CREATE TABLE identity_merge_history (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),account_id uuid NOT NULL REFERENCES wa_accounts,source_contact_id uuid NOT NULL REFERENCES contacts,target_contact_id uuid NOT NULL REFERENCES contacts,source_conversation_id uuid REFERENCES conversations,target_conversation_id uuid REFERENCES conversations,occurred_at timestamptz NOT NULL DEFAULT now());

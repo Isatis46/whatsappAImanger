@@ -1,0 +1,2 @@
+CREATE TABLE worker_heartbeats (id text PRIMARY KEY, kind text NOT NULL, seen_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE api_tokens (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL REFERENCES organizations, user_id uuid NOT NULL REFERENCES users, name text NOT NULL, token_hash text NOT NULL UNIQUE, account_ids uuid[] NOT NULL DEFAULT '{}', expires_at timestamptz NOT NULL, revoked_at timestamptz);
